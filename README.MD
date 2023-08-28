@@ -16,10 +16,11 @@ It's recommended that you use virtualenv so that existing packages aren't temper
 
 ## Results
 
-Metric used - 
+Metric used -
+
 `(Inliers / Matches) * 100`
 
-![alt text](https://github.com/minalmeg/1stadia/blob/master/results.png?raw=true)
+![alt text](![Alt text](results.png?raw=true "Title"))
 
 
 ## References
