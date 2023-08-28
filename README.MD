@@ -25,6 +25,6 @@ Metric used -
 
 ## References
 
-[OpenCV Feature Detection and Description](https://github.com/methylDragon/opencv-python-reference/blob/master/02%20OpenCV%20Feature%20Detection%20and%20Description.md)
-[Feature Matching](https://github.com/methylDragon/opencv-python-reference/blob/master/02%20OpenCV%20Feature%20Detection%20and%20Description.md)
-[ASIFT](https://github.com/makelove/OpenCV-Python-Tutorial/blob/master/%E5%AE%98%E6%96%B9samples/asift.py)
+- [OpenCV Feature Detection and Description](https://github.com/methylDragon/opencv-python-reference/blob/master/02%20OpenCV%20Feature%20Detection%20and%20Description.md)
+- [Feature Matching](https://github.com/methylDragon/opencv-python-reference/blob/master/02%20OpenCV%20Feature%20Detection%20and%20Description.md)
+- [ASIFT](https://github.com/makelove/OpenCV-Python-Tutorial/blob/master/%E5%AE%98%E6%96%B9samples/asift.py)
