@@ -20,7 +20,7 @@ Metric used -
 
 `(Inliers / Matches) * 100`
 
-![alt text](![Alt text](results.png?raw=true "Title"))
+![Alt text](results.png?raw=true "Results")
 
 
 ## References
