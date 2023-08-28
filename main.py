@@ -10,6 +10,12 @@ The program is divided into 3 parts -
     - We use FLANN here
 3. homography 
     - transformation that maps the points in tmp image to the corresponding points in the target image
+4. Evaluation Metric
+    A. F1 Score
+        - Currently only works with "target/Pepsi-vs-Coca-Cola.jpeg" and "target/rotate180.png"
+    B. (Inliers / Matches) * 100
+        - Uses inbuilt RANSAC Algorithm to get rid of outliers from the good matches.
+        - The highest number of inliers to matches ratio indicates are robust detector/threshold.
 '''
 
 
@@ -28,7 +34,8 @@ class FeatureMatching:
         self.target_img =  cv2.imread(target_path)
         self.feature_detector = cv2.SIFT_create()
         self.min_match_count = 5
-        self.pos = "left"
+        self.eval_metric = "inliers"
+        # self.pos = "left"
 
     def affine_skew(self,tilt, phi, img, mask=None):
         '''
@@ -80,8 +87,7 @@ class FeatureMatching:
         def f(p):
             t, phi = p
             timg, tmask, Ai = self.affine_skew(t, phi, img)
-            cv2.imwrite("timg.png",timg)
-            keypoints, descrs = self.featurn_detector.detectAndCompute(timg, tmask)
+            keypoints, descrs = self.feature_detector.detectAndCompute(timg, tmask)
             for kp in keypoints:
                 x, y = kp.pt
                 kp.pt = tuple( np.dot(Ai, (x, y, 1)) )
@@ -99,11 +105,14 @@ class FeatureMatching:
             print('affine sampling: %d / %d\r' % (i+1, len(params)), end='')
             keypoints.extend(k)
             descrs.extend(d)
-
-
         return keypoints, np.array(descrs)
         
     def get_kp(self,matches,all_kp,good_kp):
+        '''
+        get_kp(\matches,all_kp,good_kp) ->all matches, good matches
+
+        returns left all matches, right all matches, left good matches, right good matches
+        '''
         image = self.target_img
         width,height, channels = image.shape[1], image.shape[0], image.shape[2]
         half_width = width//2
@@ -115,7 +124,12 @@ class FeatureMatching:
         righ_match = sum([coord[0] > half_width for coord in good_kp_idx])
         return left_kp,righ_kp,left_match,righ_match
     
-    def evaluate(self,ld,rd,lm,rm):
+    def evaluate_f1(self,ld,rd,lm,rm):
+        '''
+        evaluate_f1(ld,rf,lm,rm) -> left all matches, right all matches, left good matches, right good matches
+
+        returns f1 score
+        '''
         if self.pos == "left":
             Precision = lm / (lm + rm)
             Recall = lm / (lm + (ld - lm)) 
@@ -126,6 +140,11 @@ class FeatureMatching:
         return f1_score
 
     def match_ft(self,ratio,det_name):
+        '''
+        match_ft(ratio, det_name) -> ratio for distance measure, name of the detector to be used
+
+        returns image with bounding box + matches as well as score
+        '''
         score = 0
         if det_name == "SIFT":
             kp, des = self.feature_detector.detectAndCompute(self.target_img, None)
@@ -147,7 +166,7 @@ class FeatureMatching:
         #knnMatch returns 2 best matches for all descriptors 
         matches = flann.knnMatch(des0, des, k=2)
         
-        # Adopt only good feature matches
+        # Keep good feature matches only
         good = [[m] for m, n in matches if m.distance < ratio * n.distance]
         
         # Find Homography
@@ -155,40 +174,46 @@ class FeatureMatching:
             src_pts = np.float32([kp0[m[0].queryIdx].pt for m in good]).reshape(-1, 1, 2)
             dst_pts = np.float32([kp[m[0].trainIdx].pt for m in good]).reshape(-1, 1, 2)
             M, mask = cv2.findHomography(src_pts, dst_pts, cv2.RANSAC, 5.0)
-            score = (np.sum(mask)/len(mask))*100 # (inliers / matches) * 100 
-            # h, w, c = self.tmp_img.shape 
-            # pts = np.float32([[0, 0], [0, h-1], [w-1, h-1], [w-1, 0]]).reshape(-1, 1, 2)
-            # dst = cv2.perspectiveTransform(pts, M)
+            
+
+            # Draw Bounding Box
+            h, w, c = self.tmp_img.shape 
+            pts = np.float32([[0, 0], [0, h-1], [w-1, h-1], [w-1, 0]]).reshape(-1, 1, 2)
+            dst = cv2.perspectiveTransform(pts, M)
+            frame = cv2.polylines(self.target_img, [np.int32(dst)], True, (0, 255, 0), 2, cv2.LINE_AA)
         else:
             print("No good matches found")
-            return None, score
-
+            return self.target_img, score
+        if self.eval_metric == "f1":
+            ld,rd,lm,rm = self.get_kp(good,kp,dst_pts)
+            score = self.evaluate(ld,rd,lm,rm)
+        else:
+            score = (np.sum(mask)/len(mask))*100 # (inliers / matches) * 100 
         # Visualize the matches
         draw_params = dict(flags=2)
-        img = cv2.drawMatchesKnn(self.tmp_img, kp0, self.target_img, kp, good, None, **draw_params)
-        #ld,rd,lm,rm = self.get_kp(good,kp,dst_pts)
-        #score = self.evaluate(ld,rd,lm,rm)
+        img = cv2.drawMatchesKnn(self.tmp_img, kp0, frame, kp, good, None, **draw_params)
         return img,score
         
 
 if __name__ == '__main__':
     # tmp_path = "template/coca-cola.png"
     tmp_path = "template/pepsi.png"
-    target_path = "target/rotate180.png"
+    target_path = "target/original.jpeg"
     ft_mt = FeatureMatching(target_path,tmp_path)
     detector_name = "SIFT"
-    evaluation_dict = [0.5, 0.8]
+    evaluation_dict = [0.5]
+    output_path = "output/" + detector_name + "/"  + target_path.split("/")[1].split(".")[0] + "_" + tmp_path.split("/")[1]
+    print(output_path)
     for ratio in evaluation_dict:
         start_time = time.time()
         img,score = ft_mt.match_ft(ratio,detector_name)
-        #print("--- Time taken : %s seconds ---" % (time.time() - start_time))
-        if img is not None:
-            print("Evaluation for ratio " + str(ratio) + ": " + str(score))
-            # img = cv2.resize(img, (960,480), interpolation= cv2.INTER_LINEAR)
-            # cv2.imshow("output", img)
-            # cv2.imwrite("output.png", img)
-            # cv2.waitKey(0)
-            # cv2.destroyWindow("output")
+        print("--- Time taken : %s seconds ---" % (time.time() - start_time))
+        print("Evaluation for ratio " + str(ratio) + ": " + str(round(score,3)))
+        img = cv2.resize(img, (960,480), interpolation= cv2.INTER_LINEAR)
+        cv2.imshow("Output", img)
+        # cv2.imwrite(output_path, img)
+        cv2.waitKey(0)
+        cv2.destroyWindow("output")
             
     
     
